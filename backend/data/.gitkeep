@@ -1,0 +1,2 @@
+# Datasets live here (word list, clues.sqlite). They are fetched/built locally
+# and are NOT committed — see .gitignore and docs/ARCHITECTURE.md section 7.

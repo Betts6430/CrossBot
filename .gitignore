@@ -1,0 +1,35 @@
+# ---- Node / extension ----
+node_modules/
+extension/.wxt/
+extension/.output/
+extension/.wxt-dev/
+extension/stats.html
+*.zip
+
+# ---- Python / backend ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# ---- Datasets (fetched/built locally, not committed) ----
+backend/data/*
+!backend/data/.gitkeep
+*.sqlite
+*.sqlite3
+*.db
+
+# ---- Editor / OS ----
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# ---- Local Claude Code settings ----
+.claude/settings.local.json

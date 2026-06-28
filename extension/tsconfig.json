@@ -1,0 +1,10 @@
+{
+  // WXT generates .wxt/tsconfig.json on `wxt prepare` (runs via postinstall).
+  // Run `npm install` before type-checking so this reference resolves.
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}

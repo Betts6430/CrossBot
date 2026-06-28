@@ -1,0 +1,38 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.popup {
+  width: 280px;
+  padding: 16px;
+}
+
+.popup h1 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+}
+
+.popup .status {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.popup button {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+
+.popup button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

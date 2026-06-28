@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Betts6430/CrossBot/shared/puzzle.schema.json",
+  "title": "CrossBot puzzle contract",
+  "description": "Normalized crossword representation exchanged between the extension and the backend. Loosely aligned with the .ipuz format so file import can be added later. See docs/ARCHITECTURE.md section 4.",
+  "$defs": {
+    "coord": {
+      "type": "array",
+      "description": "A [row, col] cell coordinate, zero-indexed from the top-left.",
+      "items": { "type": "integer", "minimum": 0 },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "cell": {
+      "description": "One grid cell: null = block, \"\" = empty fillable cell, a single uppercase letter = a given/known letter.",
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]?$"
+    },
+    "slot": {
+      "type": "object",
+      "description": "One answer position (an across or down entry).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier, e.g. \"1A\" or \"5D\"."
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The grid number shown at the slot's first cell."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["across", "down"]
+        },
+        "cells": {
+          "type": "array",
+          "description": "Ordered cell coordinates from the slot's start to end.",
+          "items": { "$ref": "#/$defs/coord" },
+          "minItems": 1
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of cells; equals cells.length."
+        },
+        "clue": {
+          "type": "string",
+          "description": "The clue text. May be empty if unknown (e.g. partial scrape)."
+        }
+      },
+      "required": ["id", "number", "direction", "cells", "length", "clue"],
+      "additionalProperties": false
+    },
+    "slotAnswer": {
+      "type": "object",
+      "description": "The solver's answer for a single slot.",
+      "properties": {
+        "id": { "type": "string", "description": "Matches Slot.id." },
+        "answer": {
+          "type": ["string", "null"],
+          "description": "Uppercase letters, length == slot length, or null if unsolved."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Solver confidence, 0..1."
+        }
+      },
+      "required": ["id", "answer", "confidence"],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "Puzzle": {
+      "type": "object",
+      "description": "Produced by site adapters, manual entry, or file import; consumed by the solver.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Where the puzzle came from, e.g. \"manual\", \"guardian\", \"amuse\"."
+        },
+        "title": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "cells": {
+          "type": "array",
+          "description": "Row-major grid; cells[row][col]. Length == height; each row length == width.",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/cell" }
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/slot" }
+        }
+      },
+      "required": ["width", "height", "cells", "slots"],
+      "additionalProperties": false
+    },
+    "SolveResult": {
+      "type": "object",
+      "description": "Returned by POST /solve; consumed by the overlay/UI.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["solved", "partial", "failed"]
+        },
+        "filled": {
+          "type": "array",
+          "description": "The grid with answers filled in, same shape as Puzzle.cells.",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/cell" }
+          }
+        },
+        "answers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/slotAnswer" }
+        }
+      },
+      "required": ["status", "filled", "answers"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["Puzzle", "SolveResult"],
+  "additionalProperties": false
+}
