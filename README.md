@@ -25,11 +25,12 @@ reasoning behind every decision.
 
 ## Status
 
-**Solves clued puzzles.** The backend fills a grid using a clue-answer database
-(6M+ historical clues) plus a word-list constraint solver: clue-matched answers
-are preferred, and crossings stay consistent. Manual grid entry + auto-fill work
-end to end in the popup. Not yet built: site auto-detection (in-page overlay)
-and the optional LLM booster. See the roadmap in the architecture doc.
+**Auto-solves crosswords on a real site.** On a [Crosshare](https://crosshare.org)
+puzzle page, the extension shows a "Solve with CrossBot" button that reads the
+grid + clues off the page, solves it via the backend (clue-answer database +
+word-list constraint solver), and overlays the answers in place. Manual grid
+entry also works in the popup. Not yet built: more site adapters (Amuse/PuzzleMe
+family, NYT) and the optional LLM booster. See the roadmap in the architecture doc.
 
 ## Project layout
 

@@ -6,10 +6,10 @@ export default defineConfig({
   manifest: {
     name: 'CrossBot',
     description: 'Solve and autocomplete crosswords in your browser.',
-    permissions: ['storage', 'activeTab', 'scripting'],
-    // Host permissions are added per site as adapters are built (see
-    // lib/adapters). Kept empty for now so the extension asks for nothing
-    // it doesn't yet use.
-    host_permissions: [],
+    permissions: ['storage'],
+    // The background worker fetches the local backend (a content-script fetch
+    // would hit the host page's CSP). Site match patterns live in each content
+    // script's `matches` (see entrypoints/content.ts).
+    host_permissions: ['http://localhost:8000/*', 'http://127.0.0.1:8000/*'],
   },
 });

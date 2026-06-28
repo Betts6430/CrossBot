@@ -52,6 +52,17 @@
       "required": ["id", "number", "direction", "cells", "length", "clue"],
       "additionalProperties": false
     },
+    "clueRef": {
+      "type": "object",
+      "description": "A clue referenced by grid number + direction; the backend attaches it to the matching derived entry.",
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "direction": { "type": "string", "enum": ["across", "down"] },
+        "clue": { "type": "string" }
+      },
+      "required": ["number", "direction", "clue"],
+      "additionalProperties": false
+    },
     "slotAnswer": {
       "type": "object",
       "description": "The solver's answer for a single slot.",
@@ -97,6 +108,11 @@
           "type": "array",
           "description": "Optional. Manual entry omits these and the backend derives them; site adapters may supply them with clues.",
           "items": { "$ref": "#/$defs/slot" }
+        },
+        "clues": {
+          "type": "array",
+          "description": "Optional. Clues keyed by number+direction; the backend numbers the grid and attaches them. Use instead of `slots` when cell coordinates aren't computed client-side.",
+          "items": { "$ref": "#/$defs/clueRef" }
         }
       },
       "required": ["width", "height", "cells"],

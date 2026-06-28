@@ -1,7 +1,27 @@
-// MV3 background service worker.
-//
-// Routes messages between the popup, content scripts, and the local backend.
-// Currently a no-op placeholder — message handlers land as features are built.
+import { browser } from 'wxt/browser';
+import { DEFAULT_BACKEND_URL } from '@/lib/api/client';
+import type { SolveRequest, SolveResponse } from '@/lib/messaging';
+
+// The background worker does the backend fetch: a content script's fetch to
+// localhost would be blocked by the host page's CSP, but the worker isn't
+// subject to it (and has the localhost host permission).
 export default defineBackground(() => {
-  console.log('CrossBot background ready');
+  browser.runtime.onMessage.addListener((message: unknown): Promise<SolveResponse> | undefined => {
+    const msg = message as SolveRequest;
+    if (msg?.type !== 'solve') return undefined;
+
+    return (async (): Promise<SolveResponse> => {
+      try {
+        const res = await fetch(`${msg.backendUrl ?? DEFAULT_BACKEND_URL}/solve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(msg.puzzle),
+        });
+        if (!res.ok) throw new Error(`backend ${res.status} ${res.statusText}`);
+        return { ok: true, result: await res.json() };
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
+      }
+    })();
+  });
 });

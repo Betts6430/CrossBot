@@ -1,0 +1,96 @@
+{
+  "size": {
+    "rows": 5,
+    "cols": 5
+  },
+  "grid": [
+    "P",
+    "U",
+    "B",
+    ".",
+    ".",
+    "O",
+    "N",
+    "L",
+    "Y",
+    ".",
+    "S",
+    "T",
+    "U",
+    "M",
+    "P",
+    ".",
+    "O",
+    "R",
+    "C",
+    "A",
+    ".",
+    ".",
+    "B",
+    "A",
+    "R"
+  ],
+  "clues": [
+    {
+      "dir": 0,
+      "clue": "Pint place",
+      "num": 1,
+      "explanation": null
+    },
+    {
+      "dir": 0,
+      "clue": "Exclusively",
+      "num": 4,
+      "explanation": null
+    },
+    {
+      "dir": 0,
+      "clue": "Tree remnant",
+      "num": 6,
+      "explanation": null
+    },
+    {
+      "dir": 0,
+      "clue": "Largest dolphin",
+      "num": 8,
+      "explanation": null
+    },
+    {
+      "dir": 0,
+      "clue": "Open area at some receptions",
+      "num": 9,
+      "explanation": null
+    },
+    {
+      "dir": 1,
+      "clue": "\"Neg\" alt. on a battery",
+      "num": 1,
+      "explanation": null
+    },
+    {
+      "dir": 1,
+      "clue": "Second word of The Golden Rule",
+      "num": 2,
+      "explanation": null
+    },
+    {
+      "dir": 1,
+      "clue": "Brief book jacket promo",
+      "num": 3,
+      "explanation": null
+    },
+    {
+      "dir": 1,
+      "clue": "Fun Village People lodgings",
+      "num": 5,
+      "explanation": null
+    },
+    {
+      "dir": 1,
+      "clue": "Golf goal",
+      "num": 7,
+      "explanation": null
+    }
+  ],
+  "title": "Mini 260605"
+}

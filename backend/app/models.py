@@ -29,6 +29,18 @@ class Slot(BaseModel):
     clue: str
 
 
+class ClueRef(BaseModel):
+    """A clue referenced by grid number + direction.
+
+    Lets an adapter supply clues without computing cell coordinates: the backend
+    numbers the grid and attaches each clue to the matching derived entry.
+    """
+
+    number: int
+    direction: Direction
+    clue: str
+
+
 class Puzzle(BaseModel):
     """A normalized crossword. Produced by adapters, manual entry, or import."""
 
@@ -38,8 +50,10 @@ class Puzzle(BaseModel):
     height: int
     cells: list[list[Cell]]
     # Optional: manual entry sends just the grid and the backend derives the
-    # entries. Site adapters may provide slots (with clues) directly.
+    # entries. Site adapters may provide fully-specified slots (with clues), or
+    # just `clues` keyed by number+direction for the backend to attach.
     slots: list[Slot] = Field(default_factory=list)
+    clues: list[ClueRef] = Field(default_factory=list)
 
 
 class SlotAnswer(BaseModel):

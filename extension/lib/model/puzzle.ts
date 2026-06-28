@@ -24,9 +24,16 @@ export interface Slot {
   clue: string;
 }
 
+/** A clue referenced by grid number + direction (backend attaches the cells). */
+export interface ClueRef {
+  number: number;
+  direction: Direction;
+  clue: string;
+}
+
 /** A normalized crossword. Produced by adapters, manual entry, or file import. */
 export interface Puzzle {
-  /** Origin, e.g. "manual", "guardian", "amuse". */
+  /** Origin, e.g. "manual", "crosshare". */
   source?: string;
   title?: string;
   width: number;
@@ -35,6 +42,8 @@ export interface Puzzle {
   cells: Cell[][];
   /** Optional: manual entry omits these and the backend derives them. */
   slots?: Slot[];
+  /** Optional: clues by number+direction for the backend to attach. */
+  clues?: ClueRef[];
 }
 
 /** The solver's answer for a single slot. */

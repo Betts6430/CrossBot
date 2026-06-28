@@ -241,8 +241,12 @@ The plan is to prove the engine first, then layer on automation.
    vocab + FTS5 fuzzy) built from the xd corpus by `scripts/fetch_clues.py`;
    `CandidateProvider` feeds clue answers into the CSP, preferred over plain
    word-list fill.*
-3. **First site adapter + overlay** — auto-read one supported site, solve, and
-   fill answers in place.
+3. ✅ **First site adapter + overlay** — auto-read one supported site, solve,
+   fill in place. *Done: Crosshare. `extension/lib/adapters/crosshare.ts` reads
+   the puzzle from `__NEXT_DATA__`; the content script injects a Solve button and
+   messages the background worker (which fetches the backend — a content-script
+   fetch would hit the page CSP); `lib/overlay.ts` paints answers in a fixed
+   layer anchored to each cell's rect. Verified live in a real browser.*
 4. **Polish & breadth** — per-clue fill / single-letter reveal, more site
    adapters, optional Ollama booster, then `.puz` / `.ipuz` file import.
 

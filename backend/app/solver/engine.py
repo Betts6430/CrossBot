@@ -16,13 +16,21 @@ from app.solver.grid import Coord, Entry, derive_entries
 
 
 def _entries_for(puzzle: Puzzle) -> list[Entry]:
-    """Use the puzzle's own slots (with clues) if present, else derive them."""
+    """Build entries: fully-specified slots win; else derive and attach clues."""
     if puzzle.slots:
         return [
             Entry(s.id, s.number, s.direction, tuple((r, c) for r, c in s.cells), s.clue)
             for s in puzzle.slots
         ]
-    return derive_entries(puzzle.cells)
+
+    entries = derive_entries(puzzle.cells)
+    if puzzle.clues:
+        by_key = {(c.number, c.direction): c.clue for c in puzzle.clues}
+        entries = [
+            Entry(e.id, e.number, e.direction, e.cells, by_key.get((e.number, e.direction), ""))
+            for e in entries
+        ]
+    return entries
 
 
 def solve_puzzle(puzzle: Puzzle) -> SolveResult:
