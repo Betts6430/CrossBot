@@ -1,10 +1,12 @@
 {
-  // WXT generates .wxt/tsconfig.json on `wxt prepare` (runs via postinstall).
-  // Run `npm install` before type-checking so this reference resolves.
+  // WXT generates .wxt/tsconfig.json on `wxt prepare` (runs via postinstall),
+  // which provides the path aliases (@/*, ~/* ...). Run `npm install` before
+  // type-checking so this reference resolves.
+  //
+  // `jsx` is set explicitly because the `compile` script runs `tsc`, which
+  // needs it; the WXT/esbuild build handles JSX during bundling regardless.
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "@/*": ["./*"]
-    }
+    "jsx": "react-jsx"
   }
 }
