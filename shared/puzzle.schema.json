@@ -95,10 +95,11 @@
         },
         "slots": {
           "type": "array",
+          "description": "Optional. Manual entry omits these and the backend derives them; site adapters may supply them with clues.",
           "items": { "$ref": "#/$defs/slot" }
         }
       },
-      "required": ["width", "height", "cells", "slots"],
+      "required": ["width", "height", "cells"],
       "additionalProperties": false
     },
     "SolveResult": {

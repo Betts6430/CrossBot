@@ -230,9 +230,10 @@ CrossBot/
 
 The plan is to prove the engine first, then layer on automation.
 
-1. **Engine MVP** — puzzle model + manual entry + "fill grid" using only the
+1. ✅ **Engine MVP** — puzzle model + manual entry + "fill grid" using only the
    word list and CSP solver (no scraping, no database). Proves the core fill
-   works end-to-end.
+   works end-to-end. *Done: `backend/app/solver/` (grid derivation, word-list
+   index, backtracking CSP) and the popup grid editor in `extension/`.*
 2. **Clue database** — add `clue → answer` lookup → large accuracy jump.
 3. **First site adapter + overlay** — auto-read one supported site, solve, and
    fill answers in place.

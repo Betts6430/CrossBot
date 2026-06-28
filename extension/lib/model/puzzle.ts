@@ -33,7 +33,8 @@ export interface Puzzle {
   height: number;
   /** Row-major grid; `cells[row][col]`. */
   cells: Cell[][];
-  slots: Slot[];
+  /** Optional: manual entry omits these and the backend derives them. */
+  slots?: Slot[];
 }
 
 /** The solver's answer for a single slot. */

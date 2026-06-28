@@ -37,7 +37,9 @@ class Puzzle(BaseModel):
     width: int
     height: int
     cells: list[list[Cell]]
-    slots: list[Slot]
+    # Optional: manual entry sends just the grid and the backend derives the
+    # entries. Site adapters may provide slots (with clues) directly.
+    slots: list[Slot] = Field(default_factory=list)
 
 
 class SlotAnswer(BaseModel):

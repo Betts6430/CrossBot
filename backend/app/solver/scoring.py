@@ -1,13 +1,15 @@
-"""Candidate scoring / ranking.
+"""Candidate scoring helpers.
 
-Combines signals into a single confidence score per candidate, e.g. clue-match
-strength (database), word-list quality weight, and agreement with already-fixed
-crossing letters. Used by candidates.py and csp.py. Not implemented yet.
+For the engine MVP (word-list-only fill) scoring is simple: the word list's own
+quality weight, normalized to 0..1 for the API's confidence field. When the
+clue-answer database lands, clue-match strength gets folded in here.
 """
 
 from __future__ import annotations
 
+DEFAULT_SCORE = 50.0
 
-def score_candidate(*args: object, **kwargs: object) -> float:
-    """Return a 0..1 confidence for a candidate answer."""
-    raise NotImplementedError
+
+def normalized(score: float) -> float:
+    """Map a 0..100 word-list score to a 0..1 confidence."""
+    return max(0.0, min(1.0, score / 100.0))

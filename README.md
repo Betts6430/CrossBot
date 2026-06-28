@@ -25,9 +25,10 @@ reasoning behind every decision.
 
 ## Status
 
-🚧 **Scaffolding.** The structure, the architecture, and the data contract are in
-place. The solving logic is not implemented yet — see the roadmap in the
-architecture doc.
+**Engine MVP works.** Enter a grid by hand, hit Solve, and the backend fills it
+with a consistent set of dictionary words (word-list + constraint solver). Not
+yet built: the clue-answer database, site auto-detection, and the optional LLM
+booster. See the roadmap in the architecture doc.
 
 ## Project layout
 
@@ -44,6 +45,7 @@ docs/        architecture & decisions
 ```bash
 cd backend
 uv sync                 # or: pip install -e ".[dev]"
+python scripts/fetch_wordlist.py         # one-time: downloads data/wordlist.txt
 uv run uvicorn app.main:app --reload     # serves http://localhost:8000
 ```
 

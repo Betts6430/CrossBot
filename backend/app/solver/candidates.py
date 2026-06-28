@@ -1,17 +1,15 @@
 """Per-slot candidate generation.
 
-For each slot, produce a ranked list of possible answers from:
-  - the clue-answer database (exact + fuzzy clue match), and
-  - the scored word list (length-filtered), for novel clues.
-
-Candidates feed the CSP solver in csp.py. Not implemented yet.
+For the engine MVP this is just word-list matching on the slot's current letter
+pattern. This is the seam where the clue-answer database will add candidates:
+the CSP solver only knows about `slot_candidates`, not where they come from.
 """
 
 from __future__ import annotations
 
-from app.models import Puzzle
+from app.solver.wordlist import WordList
 
 
-def generate(puzzle: Puzzle) -> dict[str, list[tuple[str, float]]]:
-    """Map each slot id -> list of (answer, score) candidates."""
-    raise NotImplementedError
+def slot_candidates(wordlist: WordList, pattern: str) -> list[str]:
+    """Ranked candidate fills for a slot given its pattern ('.' = unknown)."""
+    return wordlist.match(pattern)
