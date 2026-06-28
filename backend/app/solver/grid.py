@@ -21,6 +21,7 @@ class Entry:
     number: int
     direction: str  # "across" | "down"
     cells: tuple[Coord, ...]
+    clue: str = ""  # empty for manual-entry grids; set for clued puzzles
 
     @property
     def length(self) -> int:

@@ -15,6 +15,7 @@ def _small_wordlist(monkeypatch: pytest.MonkeyPatch) -> None:
     words = ["CAT", "ARE", "TEN", "DOG", "EAR", "OLD", "ICE", "ACE", "TIE"]
     wl = WordList.from_pairs((w, 50.0) for w in words)
     monkeypatch.setattr(engine, "get_wordlist", lambda: wl)
+    monkeypatch.setattr(engine, "get_clue_db", lambda: None)  # word-list only here
 
 
 def test_solve_open_grid_no_slots() -> None:

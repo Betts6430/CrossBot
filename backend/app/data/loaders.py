@@ -58,6 +58,11 @@ def get_wordlist() -> WordList:
     return load_wordlist()
 
 
-def connect_clue_db() -> object:
-    """Open a connection to the clue-answer SQLite database. (Later.)"""
-    raise NotImplementedError
+@lru_cache(maxsize=1)
+def get_clue_db() -> "ClueDB | None":
+    """Open and cache the clue database, or None if it hasn't been built yet."""
+    if not CLUES_DB_PATH.exists():
+        return None
+    from app.data.clue_db import ClueDB
+
+    return ClueDB.open(CLUES_DB_PATH)

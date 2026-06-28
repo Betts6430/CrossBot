@@ -177,8 +177,10 @@ overlay consumes the *same* `SolveResult`.
 
 - **Word lists** — Peter Broda's crossword word list (free for personal use,
   scored by quality) or public-domain alternatives (ENABLE/SOWPODS).
-- **Clue corpus** — publicly available crossword clue datasets loaded into
-  `clues.sqlite`.
+- **Clue corpus** — the [xd corpus](https://xd.saul.pw/data) (Saul Pwanson /
+  century-arcade), ~8M clue/answer usages, built into `clues.sqlite`. Fetched
+  locally and gitignored; not redistributed (no explicit license — it's derived
+  from published puzzles, used here for personal/local solving only).
 - **Datasets are not committed to git.** They can be large and have their own
   licenses; a setup script fetches/builds them locally into `backend/data/`.
 - **Scraping is per-site and personal-use only.** We do not redistribute scraped
@@ -234,7 +236,11 @@ The plan is to prove the engine first, then layer on automation.
    word list and CSP solver (no scraping, no database). Proves the core fill
    works end-to-end. *Done: `backend/app/solver/` (grid derivation, word-list
    index, backtracking CSP) and the popup grid editor in `extension/`.*
-2. **Clue database** — add `clue → answer` lookup → large accuracy jump.
+2. ✅ **Clue database** — `clue → answer` lookup → large accuracy jump. *Done:
+   `backend/app/data/clue_db.py` (SQLite: exact `clue_answer` table + `answers`
+   vocab + FTS5 fuzzy) built from the xd corpus by `scripts/fetch_clues.py`;
+   `CandidateProvider` feeds clue answers into the CSP, preferred over plain
+   word-list fill.*
 3. **First site adapter + overlay** — auto-read one supported site, solve, and
    fill answers in place.
 4. **Polish & breadth** — per-clue fill / single-letter reveal, more site
@@ -257,3 +263,8 @@ The plan is to prove the engine first, then layer on automation.
   step.
 - **Possible backend-free mode:** port the solver to TS/WASM if we ever want a
   zero-install, extension-only build.
+- **Solver quality:** the CSP currently returns the *first* globally consistent
+  fill (trying clue answers first, MRV order). On real interlocking puzzles this
+  picks clue answers well, but it doesn't explicitly *maximize* total clue
+  agreement, so conflicting clues can lead to a suboptimal fill. A future pass
+  could search for the highest-summed-confidence solution.

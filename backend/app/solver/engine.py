@@ -1,25 +1,25 @@
 """Top-level orchestration of a solve.
 
-MVP pipeline (see docs/ARCHITECTURE.md):
-    1. derive entries from the grid (or use those the puzzle already carries)
-    2. CSP fill using word-list candidates
-    (clue-answer database and optional LLM booster come later)
+Pipeline (see docs/ARCHITECTURE.md):
+    1. derive entries from the grid (or use those the puzzle carries, with clues)
+    2. CSP fill using a CandidateProvider = clue database + word list
+    (the optional LLM booster comes later)
 """
 
 from __future__ import annotations
 
-from app.data.loaders import get_wordlist
+from app.data.loaders import get_clue_db, get_wordlist
 from app.models import Puzzle, SlotAnswer, SolveResult
+from app.solver.candidates import CandidateProvider
 from app.solver.csp import Solver
 from app.solver.grid import Coord, Entry, derive_entries
-from app.solver.scoring import DEFAULT_SCORE, normalized
 
 
 def _entries_for(puzzle: Puzzle) -> list[Entry]:
-    """Use the puzzle's own slots if present, else derive them from the grid."""
+    """Use the puzzle's own slots (with clues) if present, else derive them."""
     if puzzle.slots:
         return [
-            Entry(s.id, s.number, s.direction, tuple((r, c) for r, c in s.cells))
+            Entry(s.id, s.number, s.direction, tuple((r, c) for r, c in s.cells), s.clue)
             for s in puzzle.slots
         ]
     return derive_entries(puzzle.cells)
@@ -27,10 +27,10 @@ def _entries_for(puzzle: Puzzle) -> list[Entry]:
 
 def solve_puzzle(puzzle: Puzzle) -> SolveResult:
     """Solve a puzzle end to end and return the filled grid + per-slot answers."""
-    wordlist = get_wordlist()
+    provider = CandidateProvider(get_wordlist(), get_clue_db())
     entries = _entries_for(puzzle)
 
-    solver = Solver(puzzle.cells, entries, wordlist)
+    solver = Solver(puzzle.cells, entries, provider)
     solver.solve()
     fill: dict[Coord, str] = solver.result_fill()
 
@@ -50,9 +50,8 @@ def solve_puzzle(puzzle: Puzzle) -> SolveResult:
         letters = [fill.get(cell) for cell in entry.cells]
         if all(letters):
             word = "".join(letters)  # type: ignore[arg-type]
-            score = wordlist.scores.get(word, DEFAULT_SCORE)
             answers.append(
-                SlotAnswer(id=entry.id, answer=word, confidence=normalized(score))
+                SlotAnswer(id=entry.id, answer=word, confidence=provider.confidence(entry, word))
             )
         else:
             complete = False

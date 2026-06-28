@@ -15,9 +15,8 @@ from __future__ import annotations
 
 import time
 
-from app.solver.candidates import slot_candidates
+from app.solver.candidates import CandidateProvider
 from app.solver.grid import Cell, Coord, Entry
-from app.solver.wordlist import WordList
 
 
 class Solver:
@@ -25,14 +24,14 @@ class Solver:
         self,
         cells: list[list[Cell]],
         entries: list[Entry],
-        wordlist: WordList,
+        provider: CandidateProvider,
         *,
         beam: int = 50,
         time_limit: float = 15.0,
         node_limit: int = 500_000,
     ) -> None:
         self.entries = entries
-        self.wordlist = wordlist
+        self.provider = provider
         self.beam = beam
         self.time_limit = time_limit
         self.node_limit = node_limit
@@ -76,11 +75,11 @@ class Solver:
             pattern = self._pattern(entry)
             if "." not in pattern:
                 # Fully determined (possibly only by crossing letters) — it must
-                # itself be a real word, otherwise this branch is a dead end.
-                if pattern not in self.wordlist.scores:
+                # be a valid fill, otherwise this branch is a dead end.
+                if not self.provider.is_valid_fill(pattern):
                     return False
                 continue
-            cands = slot_candidates(self.wordlist, pattern)
+            cands = self.provider.candidates(entry, pattern)
             if not cands:
                 return False  # dead end: nothing fits here
             if target_cands is None or len(cands) < len(target_cands):

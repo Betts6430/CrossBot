@@ -25,10 +25,11 @@ reasoning behind every decision.
 
 ## Status
 
-**Engine MVP works.** Enter a grid by hand, hit Solve, and the backend fills it
-with a consistent set of dictionary words (word-list + constraint solver). Not
-yet built: the clue-answer database, site auto-detection, and the optional LLM
-booster. See the roadmap in the architecture doc.
+**Solves clued puzzles.** The backend fills a grid using a clue-answer database
+(6M+ historical clues) plus a word-list constraint solver: clue-matched answers
+are preferred, and crossings stay consistent. Manual grid entry + auto-fill work
+end to end in the popup. Not yet built: site auto-detection (in-page overlay)
+and the optional LLM booster. See the roadmap in the architecture doc.
 
 ## Project layout
 
@@ -46,6 +47,7 @@ docs/        architecture & decisions
 cd backend
 uv sync                 # or: pip install -e ".[dev]"
 python scripts/fetch_wordlist.py         # one-time: downloads data/wordlist.txt
+python scripts/fetch_clues.py            # one-time: builds data/clues.sqlite (~500 MB)
 uv run uvicorn app.main:app --reload     # serves http://localhost:8000
 ```
 
