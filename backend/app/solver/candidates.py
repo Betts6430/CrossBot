@@ -42,6 +42,18 @@ class CandidateProvider:
         self._freq = clue_db.frequencies() if clue_db else None
         self._clue_cache: dict[str, dict[str, float]] = {}  # clue -> {answer: conf}
         self._scored_cache: dict[tuple[str, str], list[tuple[str, float]]] = {}
+        self._extra: dict[str, dict[str, float]] = {}  # slot id -> {answer: conf}
+
+    def add_candidates(self, entry_id: str, answers: Iterable[tuple[str, float]]) -> None:
+        """Inject extra scored answers for one slot (e.g. from the LLM booster).
+
+        They're scored alongside clue/word-list candidates; the highest score for a
+        word wins. Clears the scored cache so a re-solve picks them up.
+        """
+        store = self._extra.setdefault(entry_id, {})
+        for word, conf in answers:
+            store[word] = max(store.get(word, 0.0), conf)
+        self._scored_cache.clear()
 
     def prime_clues(self, clues: Iterable[str]) -> None:
         """Warm the clue cache for many clues in one parallel batch.
@@ -72,27 +84,34 @@ class CandidateProvider:
             return q
         return normalized(self.wordlist.scores.get(word, DEFAULT_SCORE))
 
-    def _score(self, word: str, clue_scores: dict[str, float]) -> float:
+    def _score(
+        self, word: str, clue_scores: dict[str, float], extra: dict[str, float] | None
+    ) -> float:
         quality = _QUALITY_FLOOR + _QUALITY_WEIGHT * self._quality(word)
-        return max(clue_scores.get(word, 0.0), quality)
+        score = max(clue_scores.get(word, 0.0), quality)
+        if extra is not None:
+            score = max(score, extra.get(word, 0.0))
+        return score
 
     def scored_candidates(self, entry: Entry, pattern: str) -> list[tuple[str, float]]:
         """Candidates matching `pattern` as (word, score), best score first."""
-        key = (entry.clue, pattern)
+        key = (entry.id, pattern)  # per-slot: injected extras are keyed by slot id
         cached = self._scored_cache.get(key)
         if cached is not None:
             return cached
 
         length = len(pattern)
         clue_scores = self._clue_scores(entry.clue)
+        extra = self._extra.get(entry.id)
         words: dict[str, None] = {}
-        for word in clue_scores:
-            if len(word) == length and _matches(pattern, word):
-                words[word] = None
+        for source in (clue_scores, extra) if extra else (clue_scores,):
+            for word in source:
+                if len(word) == length and _matches(pattern, word):
+                    words[word] = None
         for word in self.wordlist.match(pattern):
             words[word] = None
 
-        scored = [(w, self._score(w, clue_scores)) for w in words]
+        scored = [(w, self._score(w, clue_scores, extra)) for w in words]
         scored.sort(key=lambda ws: ws[1], reverse=True)
         self._scored_cache[key] = scored
         return scored
@@ -101,19 +120,21 @@ class CandidateProvider:
         return [w for w, _ in self.scored_candidates(entry, pattern)]
 
     def confidence(self, entry: Entry, word: str) -> float:
-        """0..1 score for a chosen answer (clue match vs quality prior)."""
-        return self._score(word, self._clue_scores(entry.clue))
+        """0..1 score for a chosen answer (clue/LLM match vs quality prior)."""
+        return self._score(word, self._clue_scores(entry.clue), self._extra.get(entry.id))
 
-    def top_clue_answer(self, entry: Entry) -> tuple[str, float] | None:
-        """Best clue-database answer of this slot's length, as (word, confidence).
+    def top_answer(self, entry: Entry) -> tuple[str, float] | None:
+        """Best known answer of this slot's length (clue DB or injected extras).
 
-        The clue signal alone, independent of the grid fill -- used to surface the
-        answers we're sure of even when the whole grid can't be solved.
+        The clue/LLM signal alone, independent of the grid fill -- used to surface
+        the answers we're sure of even when the whole grid can't be solved.
         """
         best: tuple[str, float] | None = None
-        for answer, conf in self._clue_scores(entry.clue).items():
-            if len(answer) == entry.length and (best is None or conf > best[1]):
-                best = (answer, conf)
+        extra = self._extra.get(entry.id)
+        for source in (self._clue_scores(entry.clue), extra) if extra else (self._clue_scores(entry.clue),):
+            for answer, conf in source.items():
+                if len(answer) == entry.length and (best is None or conf > best[1]):
+                    best = (answer, conf)
         return best
 
     def is_valid_fill(self, word: str) -> bool:

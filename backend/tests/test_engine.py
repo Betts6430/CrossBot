@@ -64,3 +64,37 @@ def test_unclued_grid_is_filled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     res = engine.solve_puzzle(Puzzle(width=3, height=1, cells=[["", "", ""]]))
     assert all(cell not in (None, "") for cell in res.filled[0])
     assert res.status == "solved"
+
+
+def test_llm_booster_resolves_an_unmatched_clue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.config import LLMConfig
+    from app.solver.llm import Gap
+
+    # The clue DB knows nothing for this clue, so without the booster the slot is a
+    # low-confidence guess and stays blank.
+    path = tmp_path / "c.sqlite"
+    build_clue_db([("DOG", "Canine")], path)
+    _use(monkeypatch, ClueDB.open(path), ["CAT", "COT", "CUT"])
+    puzzle = Puzzle(width=3, height=1, cells=[["", "", ""]],
+                    clues=[ClueRef(number=1, direction="across", clue="mystery zxqw clue")])
+    assert engine.solve_puzzle(puzzle).filled[0] == ["", "", ""]
+
+    # Enable the booster with a fake model that answers the gap. The engine should
+    # inject CAT, re-solve, and paint it.
+    class FakeClient:
+        def __init__(self) -> None:
+            self.gaps: list[Gap] = []
+
+        def generate(self, prompt: str) -> str:
+            return '{"1A": ["CAT"]}'
+
+    monkeypatch.setattr(engine, "get_llm_client", lambda: FakeClient())
+    monkeypatch.setattr(engine, "llm_config",
+                        lambda: LLMConfig("ollama", "m", "http://x", 1, 5.0, 40))
+
+    res = engine.solve_puzzle(puzzle)
+    assert res.filled[0] == ["C", "A", "T"]
+    assert res.status == "solved"
+    assert next(a for a in res.answers if a.id == "1A").confidence > 0.6

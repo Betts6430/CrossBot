@@ -3,16 +3,20 @@
 Pipeline (see docs/ARCHITECTURE.md):
     1. derive entries from the grid (or use those the puzzle carries, with clues)
     2. CSP fill using a CandidateProvider = clue database + word list
-    (the optional LLM booster comes later)
+    3. (optional, off by default) LLM booster: ask a local model about still-
+       unresolved slots, inject its answers, and re-solve -- repeat a few rounds so
+       each fill tightens the crossing letters the model sees.
 """
 
 from __future__ import annotations
 
+from app.config import llm_config
 from app.data.loaders import get_clue_db, get_wordlist
 from app.models import Puzzle, SlotAnswer, SolveResult
 from app.solver.candidates import CandidateProvider
 from app.solver.csp import Solver
 from app.solver.grid import Coord, Entry, derive_entries
+from app.solver.llm import Gap, boost, get_llm_client
 
 # For a *clued* slot, only paint a cell when some covering slot scores at least
 # this. A clue match (exact ~0.9-0.99, top fuzzy ~0.6) clears it; a fill chosen
@@ -70,7 +74,7 @@ def _painted_letters(
 
     anchors: list[tuple[float, Entry, str]] = []
     for entry in entries:
-        top = provider.top_clue_answer(entry) if entry.clue else None
+        top = provider.top_answer(entry) if entry.clue else None
         if top and top[1] >= CONFIDENCE_THRESHOLD:
             anchors.append((top[1], entry, top[0]))
     anchors.sort(key=lambda a: a[0], reverse=True)
@@ -95,6 +99,32 @@ def _painted_letters(
     return placed
 
 
+def _solve_once(
+    cells: list[list[object]], entries: list[Entry], provider: CandidateProvider
+) -> tuple[dict[Coord, str], dict[str, tuple[str, float]], dict[Coord, str]]:
+    """One CSP solve + paint pass: returns (fill, assignment, painted letters)."""
+    solver = Solver(cells, entries, provider)
+    solver.solve()
+    fill = solver.result_fill()
+    assignment = solver.best_assignment
+    shown = _painted_letters(entries, cells, fill, assignment, solver.solved, provider)
+    return fill, assignment, shown
+
+
+def _gaps(entries: list[Entry], shown: dict[Coord, str], limit: int) -> list[Gap]:
+    """Clued slots not yet confidently filled, with the crossing letters known so
+    far, most-constrained first (where the model is most accurate)."""
+    ranked: list[tuple[int, Gap]] = []
+    for entry in entries:
+        if not entry.clue or all(cell in shown for cell in entry.cells):
+            continue
+        known = sum(1 for cell in entry.cells if cell in shown)
+        pattern = "".join(shown.get(cell, ".") for cell in entry.cells)
+        ranked.append((known, Gap(entry.id, entry.clue, entry.length, pattern)))
+    ranked.sort(key=lambda kg: kg[0], reverse=True)
+    return [gap for _, gap in ranked[:limit]]
+
+
 def solve_puzzle(puzzle: Puzzle) -> SolveResult:
     """Solve a puzzle end to end and return the filled grid + per-slot answers."""
     provider = CandidateProvider(get_wordlist(), get_clue_db())
@@ -104,16 +134,22 @@ def solve_puzzle(puzzle: Puzzle) -> SolveResult:
     # one at a time -- the dominant cost on big grids.
     provider.prime_clues(entry.clue for entry in entries)
 
-    solver = Solver(puzzle.cells, entries, provider)
-    solver.solve()
-    fill: dict[Coord, str] = solver.result_fill()
-    assignment = solver.best_assignment  # slot id -> (word, score)
+    fill, assignment, shown_letters = _solve_once(puzzle.cells, entries, provider)
 
-    # Letters we trust enough to paint (confident clue answers, plus the solved
-    # fill where the grid fully solved). See _painted_letters.
-    shown_letters = _painted_letters(
-        entries, puzzle.cells, fill, assignment, solver.solved, provider
-    )
+    # Optional LLM booster (off by default): ask a local model about the slots still
+    # unresolved, feeding it their crossing letters; inject the answers and re-solve.
+    client = get_llm_client()
+    if client is not None:
+        for _ in range(max(1, llm_config().rounds)):
+            gaps = _gaps(entries, shown_letters, llm_config().max_gaps)
+            if not gaps:
+                break
+            extra = boost(gaps, client)
+            if not extra:
+                break
+            for slot_id, scored in extra.items():
+                provider.add_candidates(slot_id, scored)
+            fill, assignment, shown_letters = _solve_once(puzzle.cells, entries, provider)
 
     answers: list[SlotAnswer] = []
     for entry in entries:
