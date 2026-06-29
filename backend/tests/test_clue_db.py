@@ -54,3 +54,21 @@ def test_is_known_answer(db: ClueDB) -> None:
     assert db.is_known_answer("DOG")
     assert not db.is_known_answer("ZZZZZ")
     assert not db.is_known_answer("1UP")  # was filtered out
+
+
+def test_lookup_many_matches_serial(db: ClueDB) -> None:
+    # Parallel batch lookup must return exactly what serial lookups would, keyed
+    # by clue (duplicates collapsed).
+    clues = ["feline pet", "Beloved pet", "Canine pet", "feline pet"]
+    batch = db.lookup_many(clues, max_workers=4)
+    assert set(batch) == {"feline pet", "Beloved pet", "Canine pet"}
+    for clue, scored in batch.items():
+        assert scored == db.lookup(clue)
+
+
+def test_lookup_many_without_path_falls_back(db: ClueDB) -> None:
+    # An in-memory handle (no path) can't open per-thread connections; it should
+    # still answer correctly, just serially.
+    handle = ClueDB(db.conn)  # no path
+    assert handle.path is None
+    assert handle.lookup_many(["feline pet"]) == {"feline pet": db.lookup("feline pet")}

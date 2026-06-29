@@ -17,6 +17,8 @@ plain word list lacks).
 
 from __future__ import annotations
 
+from typing import Iterable
+
 from app.data.clue_db import ClueDB
 from app.solver.grid import Entry
 from app.solver.scoring import DEFAULT_SCORE, normalized, quality_from_frequency
@@ -40,6 +42,20 @@ class CandidateProvider:
         self._freq = clue_db.frequencies() if clue_db else None
         self._clue_cache: dict[str, dict[str, float]] = {}  # clue -> {answer: conf}
         self._scored_cache: dict[tuple[str, str], list[tuple[str, float]]] = {}
+
+    def prime_clues(self, clues: Iterable[str]) -> None:
+        """Warm the clue cache for many clues in one parallel batch.
+
+        The per-clue lookups are otherwise driven lazily by candidate generation,
+        one at a time; priming them together up front is much faster on big grids.
+        """
+        if not self.clue_db:
+            return
+        todo = [c for c in dict.fromkeys(clues) if c and c not in self._clue_cache]
+        if not todo:
+            return
+        for clue, scored in self.clue_db.lookup_many(todo).items():
+            self._clue_cache[clue] = dict(scored)
 
     def _clue_scores(self, clue: str) -> dict[str, float]:
         cached = self._clue_cache.get(clue)

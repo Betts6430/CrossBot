@@ -100,6 +100,10 @@ def solve_puzzle(puzzle: Puzzle) -> SolveResult:
     provider = CandidateProvider(get_wordlist(), get_clue_db())
     entries = _entries_for(puzzle)
 
+    # Warm every clue lookup in one parallel batch before the solver pulls them in
+    # one at a time -- the dominant cost on big grids.
+    provider.prime_clues(entry.clue for entry in entries)
+
     solver = Solver(puzzle.cells, entries, provider)
     solver.solve()
     fill: dict[Coord, str] = solver.result_fill()

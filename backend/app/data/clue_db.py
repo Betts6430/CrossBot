@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Iterable
 
@@ -127,49 +129,95 @@ def _fts_match(nclue: str) -> str:
     return " OR ".join(f'"{t}"' for t in tokens)
 
 
+def _lookup(conn: sqlite3.Connection, clue: str, limit: int) -> list[tuple[str, float]]:
+    """The query itself, on a given connection: exact matches beat fuzzy."""
+    nclue = normalize_clue(clue)
+    if not nclue:
+        return []
+    scores: dict[str, float] = {}
+
+    # Exact normalized-clue match, most-used answer first.
+    exact = conn.execute(
+        "SELECT answer FROM clue_answer WHERE nclue = ? ORDER BY n DESC LIMIT ?",
+        (nclue, limit),
+    ).fetchall()
+    for i, (answer,) in enumerate(exact):
+        scores[answer] = max(scores.get(answer, 0.0), 0.99 - 0.002 * i)
+
+    # Fuzzy token-overlap via FTS, ranked by bm25 (SQLite: lower = better).
+    match = _fts_match(nclue)
+    if match:
+        try:
+            fuzzy = conn.execute(
+                "SELECT answer FROM clue_fts WHERE clue_fts MATCH ? "
+                "ORDER BY bm25(clue_fts) LIMIT ?",
+                (match, limit),
+            ).fetchall()
+            for i, (answer,) in enumerate(fuzzy):
+                scores[answer] = max(scores.get(answer, 0.0), 0.6 - 0.004 * i)
+        except sqlite3.OperationalError:
+            pass
+
+    return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+
+
 class ClueDB:
     """Read-only query interface over clues.sqlite."""
 
-    def __init__(self, conn: sqlite3.Connection) -> None:
+    def __init__(self, conn: sqlite3.Connection, path: Path | str | None = None) -> None:
         self.conn = conn
+        self.path = str(path) if path is not None else None
         self._answer_cache: dict[str, bool] = {}
         self._freq: dict[str, int] | None = None
 
     @classmethod
     def open(cls, path: Path | str) -> "ClueDB":
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
-        return cls(conn)
+        return cls(conn, path)
 
     def lookup(self, clue: str, limit: int = 40) -> list[tuple[str, float]]:
         """Ranked (ANSWER, confidence) for a clue: exact matches beat fuzzy."""
-        nclue = normalize_clue(clue)
-        if not nclue:
-            return []
-        scores: dict[str, float] = {}
+        return _lookup(self.conn, clue, limit)
 
-        # Exact normalized-clue match, most-used answer first.
-        exact = self.conn.execute(
-            "SELECT answer FROM clue_answer WHERE nclue = ? ORDER BY n DESC LIMIT ?",
-            (nclue, limit),
-        ).fetchall()
-        for i, (answer,) in enumerate(exact):
-            scores[answer] = max(scores.get(answer, 0.0), 0.99 - 0.002 * i)
+    def lookup_many(
+        self, clues: Iterable[str], limit: int = 40, max_workers: int = 8
+    ) -> dict[str, list[tuple[str, float]]]:
+        """Look up several clues at once, in parallel.
 
-        # Fuzzy token-overlap via FTS, ranked by bm25 (SQLite: lower = better).
-        match = _fts_match(nclue)
-        if match:
-            try:
-                fuzzy = self.conn.execute(
-                    "SELECT answer FROM clue_fts WHERE clue_fts MATCH ? "
-                    "ORDER BY bm25(clue_fts) LIMIT ?",
-                    (match, limit),
-                ).fetchall()
-                for i, (answer,) in enumerate(fuzzy):
-                    scores[answer] = max(scores.get(answer, 0.0), 0.6 - 0.004 * i)
-            except sqlite3.OperationalError:
-                pass
+        The fuzzy FTS query dominates a solve's latency (~tens of ms each over the
+        ~500 MB index), and SQLite releases the GIL during a query, so running them
+        on a small pool of threads -- each with its own read-only connection --
+        gives a real speedup. Falls back to serial when the DB wasn't opened from a
+        path (e.g. an in-memory test handle) or there's nothing to gain.
+        """
+        uniq = list(dict.fromkeys(clues))
+        if self.path is None or len(uniq) <= 1:
+            return {c: _lookup(self.conn, c, limit) for c in uniq}
 
-        return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+        local = threading.local()
+        opened: list[sqlite3.Connection] = []
+        opened_lock = threading.Lock()
+
+        def conn_for_thread() -> sqlite3.Connection:
+            conn = getattr(local, "conn", None)
+            if conn is None:
+                conn = sqlite3.connect(
+                    f"file:{self.path}?mode=ro", uri=True, check_same_thread=False
+                )
+                local.conn = conn
+                with opened_lock:
+                    opened.append(conn)
+            return conn
+
+        def task(clue: str) -> tuple[str, list[tuple[str, float]]]:
+            return clue, _lookup(conn_for_thread(), clue, limit)
+
+        try:
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(uniq))) as pool:
+                return dict(pool.map(task, uniq))
+        finally:
+            for conn in opened:
+                conn.close()
 
     def frequencies(self) -> dict[str, int]:
         """All answers -> how often they appear as a fill (a quality prior).

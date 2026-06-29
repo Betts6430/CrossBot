@@ -286,6 +286,9 @@ The plan is to prove the engine first, then layer on automation.
   a hard grid we surface the answers we know (the strong clue answers, placed as
   consistent anchors) and leave the rest blank. Unclued manual-entry grids have no
   clue to doubt, so they're filled in full.
-- **Solve latency on big grids:** clue-DB lookups are ~12 s for a 70-clue grid
-  (serial SQLite FTS fuzzy queries); minis (~10 clues) are ~1.5 s. Parallelizing
-  the lookups (per-thread read-only connections) is the next perf step.
+- **Solve latency on big grids:** clue-DB lookups are now parallelized
+  (`ClueDB.lookup_many`: a thread pool with per-thread read-only connections,
+  primed once via `CandidateProvider.prime_clues`) — a 70-clue grid dropped from
+  ~12 s to ~2.4 s (~5×). The remaining ~8 s on a hard 15×15 is the solver's own
+  time budget (it can't complete, so it searches to the limit); tightening that is
+  the next lever.

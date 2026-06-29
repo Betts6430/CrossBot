@@ -82,7 +82,8 @@ Accuracy on a full 15×15 is **signal-limited** (~15–20%): most themeless clue
 no corpus match, so there's little to solve from. So `engine.py` **paints only
 confident cells** — a clued cell shows only when a covering slot clears
 `CONFIDENCE_THRESHOLD` (a clue match), surfacing what we know and leaving the rest
-blank; unclued manual-entry grids fill fully. Minis solve ~100%. Big-grid solve
-latency is dominated by serial clue-DB FTS lookups (~12 s for 70 clues) — the next
-perf target. See ARCHITECTURE §11. Roadmap: §9 (steps 1–3 done; step 4 = LLM
-booster + breadth).
+blank; unclued manual-entry grids fill fully. Minis solve ~100%. Clue-DB lookups
+are parallelized (`ClueDB.lookup_many` + `CandidateProvider.prime_clues`: per-thread
+read-only connections), ~5× faster on a 70-clue grid; the rest of a hard 15×15's
+time is the solver's own search budget. See ARCHITECTURE §11. Roadmap: §9 (steps
+1–3 done; step 4 = LLM booster + breadth).
