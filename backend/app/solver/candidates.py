@@ -123,18 +123,25 @@ class CandidateProvider:
         """0..1 score for a chosen answer (clue/LLM match vs quality prior)."""
         return self._score(word, self._clue_scores(entry.clue), self._extra.get(entry.id))
 
-    def top_answer(self, entry: Entry) -> tuple[str, float] | None:
-        """Best known answer of this slot's length (clue DB or injected extras).
+    def base_confidence(self, entry: Entry, word: str) -> float:
+        """Confidence from clue DB + quality only, ignoring injected (LLM) answers.
 
-        The clue/LLM signal alone, independent of the grid fill -- used to surface
-        the answers we're sure of even when the whole grid can't be solved.
+        Lets the painter tell a clue-corroborated cell from one an LLM merely
+        guessed, so the booster's own guesses paint only with corroboration.
+        """
+        return self._score(word, self._clue_scores(entry.clue), None)
+
+    def top_clue_answer(self, entry: Entry) -> tuple[str, float] | None:
+        """Best clue-database answer of this slot's length, as (word, confidence).
+
+        The clue signal alone, independent of the grid fill -- used to anchor the
+        paint even when the whole grid can't be solved. (LLM answers are *not*
+        anchors; they paint only via the corroboration tier in the engine.)
         """
         best: tuple[str, float] | None = None
-        extra = self._extra.get(entry.id)
-        for source in (self._clue_scores(entry.clue), extra) if extra else (self._clue_scores(entry.clue),):
-            for answer, conf in source.items():
-                if len(answer) == entry.length and (best is None or conf > best[1]):
-                    best = (answer, conf)
+        for answer, conf in self._clue_scores(entry.clue).items():
+            if len(answer) == entry.length and (best is None or conf > best[1]):
+                best = (answer, conf)
         return best
 
     def is_valid_fill(self, word: str) -> bool:

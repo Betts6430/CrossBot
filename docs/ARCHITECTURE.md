@@ -149,8 +149,10 @@ overlay consumes the *same* `SolveResult`.
     letter patterns; returns validated, scored candidates. **Wired into
     `engine.solve_puzzle`**: after the CSP solve, leftover clued slots become
     `Gap`s, get boosted, are injected via `CandidateProvider.add_candidates`, and
-    the grid is re-solved — repeated for a few rounds so each fill tightens the
-    patterns the model sees.
+    the grid is re-solved — repeated for a few rounds (stopping early on no
+    progress) so each fill tightens the patterns the model sees. The model's
+    answers improve the fill but are **painted only where corroborated** by
+    confident (clue-DB/given) crossings, so a free-floating guess never shows.
   - `engine.py` — orchestrates the above.
 - **`app/data`** — loaders for the word list and the clue database.
 - **`data/`** — the actual datasets (word list, `clues.sqlite`). **Not committed**
@@ -255,9 +257,10 @@ The plan is to prove the engine first, then layer on automation.
    fetch would hit the page CSP); `lib/overlay.ts` paints answers in a fixed
    layer anchored to each cell's rect. Verified live in a real browser.*
 4. **Polish & breadth** — per-clue fill / single-letter reveal, more site
-   adapters, optional Ollama booster (*in progress*: client/prompt/parse +
-   iterative engine integration landed; confidence calibration + extension toggle
-   + live validation next), then `.puz` / `.ipuz` file import.
+   adapters, optional Ollama booster (*in progress*: client/prompt/parse, iterative
+   engine integration, and confidence calibration landed — LLM answers feed the CSP
+   but only paint where corroborated by confident crossings; extension toggle +
+   live validation next), then `.puz` / `.ipuz` file import.
 
 ---
 

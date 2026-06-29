@@ -66,14 +66,24 @@ def test_unclued_grid_is_filled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert res.status == "solved"
 
 
-def test_llm_booster_resolves_an_unmatched_clue(
+def _enable_booster(monkeypatch: pytest.MonkeyPatch, reply: str, corroboration: float) -> None:
+    from app.config import LLMConfig
+
+    class FakeClient:
+        def generate(self, prompt: str) -> str:
+            return reply
+
+    monkeypatch.setattr(engine, "get_llm_client", lambda: FakeClient())
+    monkeypatch.setattr(
+        engine, "llm_config",
+        lambda: LLMConfig("ollama", "m", "http://x", 2, 5.0, 40, corroboration),
+    )
+
+
+def test_llm_answer_paints_when_policy_is_always(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.config import LLMConfig
-    from app.solver.llm import Gap
-
-    # The clue DB knows nothing for this clue, so without the booster the slot is a
-    # low-confidence guess and stays blank.
+    # Clue DB knows nothing for this clue, so without the booster it stays blank.
     path = tmp_path / "c.sqlite"
     build_clue_db([("DOG", "Canine")], path)
     _use(monkeypatch, ClueDB.open(path), ["CAT", "COT", "CUT"])
@@ -81,20 +91,36 @@ def test_llm_booster_resolves_an_unmatched_clue(
                     clues=[ClueRef(number=1, direction="across", clue="mystery zxqw clue")])
     assert engine.solve_puzzle(puzzle).filled[0] == ["", "", ""]
 
-    # Enable the booster with a fake model that answers the gap. The engine should
-    # inject CAT, re-solve, and paint it.
-    class FakeClient:
-        def __init__(self) -> None:
-            self.gaps: list[Gap] = []
-
-        def generate(self, prompt: str) -> str:
-            return '{"1A": ["CAT"]}'
-
-    monkeypatch.setattr(engine, "get_llm_client", lambda: FakeClient())
-    monkeypatch.setattr(engine, "llm_config",
-                        lambda: LLMConfig("ollama", "m", "http://x", 1, 5.0, 40))
-
+    # corroboration=0 ("always") paints even this isolated answer -> proves the
+    # inject -> re-solve -> paint mechanism end to end.
+    _enable_booster(monkeypatch, '{"1A": ["CAT"]}', corroboration=0.0)
     res = engine.solve_puzzle(puzzle)
     assert res.filled[0] == ["C", "A", "T"]
-    assert res.status == "solved"
     assert next(a for a in res.answers if a.id == "1A").confidence > 0.6
+
+
+def test_llm_answer_paints_only_where_corroborated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 3x3 word square CAT/ARE/TEA. The DB anchors 1A, 2D, 3D; the booster answers
+    # 4A=ARE (two cells fixed by anchors -> corroborated) and 1D=CAT (only one cell
+    # fixed -> not corroborated at the 0.5 default).
+    path = tmp_path / "c.sqlite"
+    build_clue_db([("CAT", "Feline"), ("ARE", "Exist"), ("TEA", "Drink")], path)
+    _use(monkeypatch, ClueDB.open(path), ["CAT", "ARE", "TEA"])
+    puzzle = Puzzle(
+        width=3, height=3, cells=[["", "", ""], ["", "", ""], ["", "", ""]],
+        clues=[
+            ClueRef(number=1, direction="across", clue="Feline"),   # 1A -> CAT (DB)
+            ClueRef(number=2, direction="down", clue="Exist"),      # 2D -> ARE (DB)
+            ClueRef(number=3, direction="down", clue="Drink"),      # 3D -> TEA (DB)
+            ClueRef(number=4, direction="across", clue="mystery a"),  # 4A -> LLM
+            ClueRef(number=1, direction="down", clue="mystery b"),    # 1D -> LLM
+            ClueRef(number=5, direction="across", clue="mystery c"),  # 5A -> unanswered
+        ],
+    )
+    _enable_booster(monkeypatch, '{"4A": ["ARE"], "1D": ["CAT"]}', corroboration=0.5)
+    res = engine.solve_puzzle(puzzle)
+
+    assert res.filled[1] == ["A", "R", "E"]  # 4A painted: (1,0) via corroborated LLM
+    assert res.filled[2][0] == ""            # 1D under-corroborated, 5A unanswered -> blank

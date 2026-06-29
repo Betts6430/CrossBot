@@ -72,8 +72,12 @@ export PATH="$HOME/.local/node/bin:$PATH" && npm test --prefix extension
   Playwright headful (works via WSLg) — installed transiently, not a committed dep.
 - **LLM booster is off by default and $0** (local Ollama only). Enable with env:
   `CROSSBOT_LLM=ollama` (+ optional `CROSSBOT_LLM_MODEL`, default `qwen2.5:14b`;
-  `CROSSBOT_LLM_URL`). Config in `app/config.py`, client in `app/solver/llm.py`.
-  Tests must never hit a real model — use a fake client (see `tests/test_llm.py`).
+  `CROSSBOT_LLM_URL`, `CROSSBOT_LLM_ROUNDS`, `CROSSBOT_LLM_MAX_GAPS`). Config in
+  `app/config.py`, client in `app/solver/llm.py`. It feeds the CSP extra candidates
+  for unresolved slots, but its answers **only paint when corroborated** by
+  confident (clue-DB/given) crossings — `CROSSBOT_LLM_CORROBORATION` (default 0.5)
+  is the fraction of an answer's cells that must already be known; 0 = always paint,
+  >1 = never. Tests must never hit a real model — use a fake client (`tests/test_llm.py`).
 
 ## Solver behaviour & limitation
 

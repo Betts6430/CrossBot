@@ -10,6 +10,8 @@ Pipeline (see docs/ARCHITECTURE.md):
 
 from __future__ import annotations
 
+import math
+
 from app.config import llm_config
 from app.data.loaders import get_clue_db, get_wordlist
 from app.models import Puzzle, SlotAnswer, SolveResult
@@ -50,65 +52,78 @@ def _painted_letters(
     entries: list[Entry],
     cells: list[list[object]],
     fill: dict[Coord, str],
-    assignment: dict[str, tuple[str, float]],
     solved: bool,
     provider: CandidateProvider,
+    corroboration: float,
 ) -> dict[Coord, str]:
     """The letters we trust enough to paint -- the heart of "show only what we know".
 
-    Two sources, in trust order:
-      1. **Clue anchors.** Each clued slot's best clue-database answer (confidence
-         >= threshold) is laid down highest-confidence first, skipping any that
-         conflicts with a given letter or an already-placed stronger answer. This
-         surfaces the answers we actually know even when the whole grid can't solve.
-      2. **The solved fill.** If the grid fully solved, remaining cells are filled
-         from the globally-consistent fill, but only where a covering slot is
-         confident -- or unclued, since a manual-entry "fill the grid" has no clue
-         to doubt. Anchors win any overlap (a clue answer beats a crossing guess).
+    Three tiers, in trust order; earlier tiers win any overlap:
+      1. **Clue anchors + givens.** Each clued slot's best clue-database answer
+         (>= threshold) laid down strongest-first, skipping conflicts. These cells
+         are *confident* -- trusted independently of the LLM.
+      2. **The confident fill** (only if the grid fully solved): cells of slots the
+         clue DB scores >= threshold, plus unclued slots (manual-entry "fill the
+         grid" has no clue to doubt). Also confident.
+      3. **LLM-lifted slots** (only if solved): a slot the booster pushed over the
+         threshold paints only where enough of its cells (``corroboration`` of them)
+         are already confident from tiers 1-2 -- so the model extends known
+         structure but a free-floating guess stays blank.
     """
     placed: dict[Coord, str] = {}
     for r, row in enumerate(cells):
         for c, value in enumerate(row):
             if isinstance(value, str) and value != "":
                 placed[(r, c)] = value.upper()  # given letters are certain
+    confident: set[Coord] = set(placed)
 
     anchors: list[tuple[float, Entry, str]] = []
     for entry in entries:
-        top = provider.top_answer(entry) if entry.clue else None
+        top = provider.top_clue_answer(entry) if entry.clue else None
         if top and top[1] >= CONFIDENCE_THRESHOLD:
             anchors.append((top[1], entry, top[0]))
     anchors.sort(key=lambda a: a[0], reverse=True)
     for _, entry, word in anchors:
         if all(placed.get(cell, ch) == ch for cell, ch in zip(entry.cells, word)):
             placed.update(zip(entry.cells, word))
+            confident.update(entry.cells)
 
     if solved:
-        for entry in entries:
+        for entry in entries:  # tier 2: confident DB / unclued fill
             if not all(cell in fill for cell in entry.cells):
                 continue
-            confidence = (
-                assignment[entry.id][1]
-                if entry.id in assignment
-                else provider.confidence(entry, "".join(fill[c] for c in entry.cells))
-            )
-            if entry.clue and confidence < CONFIDENCE_THRESHOLD:
+            word = "".join(fill[cell] for cell in entry.cells)
+            if not entry.clue or provider.base_confidence(entry, word) >= CONFIDENCE_THRESHOLD:
+                placed.update((cell, fill[cell]) for cell in entry.cells if cell not in placed)
+                confident.update(entry.cells)
+
+        for entry in entries:  # tier 3: LLM-lifted slots, only where corroborated
+            if not entry.clue or not all(cell in fill for cell in entry.cells):
                 continue
-            for cell in entry.cells:
-                placed.setdefault(cell, fill[cell])  # anchors/givens win
+            word = "".join(fill[cell] for cell in entry.cells)
+            if provider.base_confidence(entry, word) >= CONFIDENCE_THRESHOLD:
+                continue  # already painted in tier 2
+            if provider.confidence(entry, word) < CONFIDENCE_THRESHOLD:
+                continue  # not even the LLM is confident
+            need = math.ceil(corroboration * len(entry.cells))
+            if sum(1 for cell in entry.cells if cell in confident) >= need:
+                placed.update((cell, fill[cell]) for cell in entry.cells if cell not in placed)
 
     return placed
 
 
 def _solve_once(
-    cells: list[list[object]], entries: list[Entry], provider: CandidateProvider
+    cells: list[list[object]],
+    entries: list[Entry],
+    provider: CandidateProvider,
+    corroboration: float,
 ) -> tuple[dict[Coord, str], dict[str, tuple[str, float]], dict[Coord, str]]:
     """One CSP solve + paint pass: returns (fill, assignment, painted letters)."""
     solver = Solver(cells, entries, provider)
     solver.solve()
     fill = solver.result_fill()
-    assignment = solver.best_assignment
-    shown = _painted_letters(entries, cells, fill, assignment, solver.solved, provider)
-    return fill, assignment, shown
+    shown = _painted_letters(entries, cells, fill, solver.solved, provider, corroboration)
+    return fill, solver.best_assignment, shown
 
 
 def _gaps(entries: list[Entry], shown: dict[Coord, str], limit: int) -> list[Gap]:
@@ -134,14 +149,18 @@ def solve_puzzle(puzzle: Puzzle) -> SolveResult:
     # one at a time -- the dominant cost on big grids.
     provider.prime_clues(entry.clue for entry in entries)
 
-    fill, assignment, shown_letters = _solve_once(puzzle.cells, entries, provider)
+    cfg = llm_config()
+    fill, assignment, shown_letters = _solve_once(
+        puzzle.cells, entries, provider, cfg.corroboration
+    )
 
     # Optional LLM booster (off by default): ask a local model about the slots still
     # unresolved, feeding it their crossing letters; inject the answers and re-solve.
+    # Stop once a round resolves nothing new (or there's nothing left to ask).
     client = get_llm_client()
     if client is not None:
-        for _ in range(max(1, llm_config().rounds)):
-            gaps = _gaps(entries, shown_letters, llm_config().max_gaps)
+        for _ in range(max(1, cfg.rounds)):
+            gaps = _gaps(entries, shown_letters, cfg.max_gaps)
             if not gaps:
                 break
             extra = boost(gaps, client)
@@ -149,7 +168,12 @@ def solve_puzzle(puzzle: Puzzle) -> SolveResult:
                 break
             for slot_id, scored in extra.items():
                 provider.add_candidates(slot_id, scored)
-            fill, assignment, shown_letters = _solve_once(puzzle.cells, entries, provider)
+            before = len(shown_letters)
+            fill, assignment, shown_letters = _solve_once(
+                puzzle.cells, entries, provider, cfg.corroboration
+            )
+            if len(shown_letters) <= before:
+                break  # no progress -- further rounds won't help
 
     answers: list[SlotAnswer] = []
     for entry in entries:

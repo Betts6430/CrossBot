@@ -22,6 +22,10 @@ class LLMConfig:
     rounds: int  # propose -> re-solve passes (each pass tightens crossing letters)
     timeout: float  # seconds per model call
     max_gaps: int  # most clues to ask about per pass (caps latency)
+    # Fraction of an LLM answer's cells that must already be confident (from clue
+    # answers / givens) before we paint it -- the model can extend known structure
+    # but a free-floating guess stays unpainted. 0 = always paint, >1 = never.
+    corroboration: float
 
     @property
     def enabled(self) -> bool:
@@ -53,4 +57,5 @@ def llm_config() -> LLMConfig:
         rounds=_int("CROSSBOT_LLM_ROUNDS", 2),
         timeout=_float("CROSSBOT_LLM_TIMEOUT", 60.0),
         max_gaps=_int("CROSSBOT_LLM_MAX_GAPS", 40),
+        corroboration=_float("CROSSBOT_LLM_CORROBORATION", 0.5),
     )
