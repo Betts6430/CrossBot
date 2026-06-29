@@ -70,6 +70,10 @@ export PATH="$HOME/.local/node/bin:$PATH" && npm test --prefix extension
   `Betts6430/CrossBot`; the default `github.com` key is a different account).
 - Tests: backend = pytest; extension = Vitest (jsdom). Real-browser checks use
   Playwright headful (works via WSLg) — installed transiently, not a committed dep.
+- **LLM booster is off by default and $0** (local Ollama only). Enable with env:
+  `CROSSBOT_LLM=ollama` (+ optional `CROSSBOT_LLM_MODEL`, default `qwen2.5:14b`;
+  `CROSSBOT_LLM_URL`). Config in `app/config.py`, client in `app/solver/llm.py`.
+  Tests must never hit a real model — use a fake client (see `tests/test_llm.py`).
 
 ## Solver behaviour & limitation
 

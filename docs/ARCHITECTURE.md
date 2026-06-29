@@ -143,7 +143,11 @@ overlay consumes the *same* `SolveResult`.
   - `candidates.py` — per-slot candidate generation (DB lookup + word list).
   - `csp.py` — constraint-satisfaction fill (propagation + weighted backtracking).
   - `scoring.py` — candidate scoring / ranking.
-  - `llm.py` — the optional, off-by-default LLM booster (Ollama / BYO key).
+  - `llm.py` — the optional, off-by-default LLM booster. Client + prompt/parse
+    layer is implemented (`Gap`, `OllamaClient`, `build_prompt`, `parse_answers`,
+    `boost`); enabled via `CROSSBOT_LLM=ollama` (config in `app/config.py`). It is
+    fed only unresolved slots with their crossing-letter patterns and returns
+    validated, scored candidates. *Not yet wired into the solve pipeline.*
   - `engine.py` — orchestrates the above.
 - **`app/data`** — loaders for the word list and the clue database.
 - **`data/`** — the actual datasets (word list, `clues.sqlite`). **Not committed**
@@ -248,7 +252,9 @@ The plan is to prove the engine first, then layer on automation.
    fetch would hit the page CSP); `lib/overlay.ts` paints answers in a fixed
    layer anchored to each cell's rect. Verified live in a real browser.*
 4. **Polish & breadth** — per-clue fill / single-letter reveal, more site
-   adapters, optional Ollama booster, then `.puz` / `.ipuz` file import.
+   adapters, optional Ollama booster (*in progress*: client/prompt/parse layer
+   landed; engine integration + iterative re-solve next), then `.puz` / `.ipuz`
+   file import.
 
 ---
 
