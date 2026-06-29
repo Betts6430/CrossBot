@@ -71,9 +71,18 @@ export PATH="$HOME/.local/node/bin:$PATH" && npm test --prefix extension
 - Tests: backend = pytest; extension = Vitest (jsdom). Real-browser checks use
   Playwright headful (works via WSLg) — installed transiently, not a committed dep.
 
-## Known limitation
+## Solver behaviour & limitation
 
-The CSP returns the *first* globally consistent fill, not the one that maximizes
-clue agreement — an entry completed via crossings ignores its own clue (e.g. a
-"Golf goal" entry may fill PAM instead of PAR). See ARCHITECTURE §11. Roadmap and
-status: ARCHITECTURE §9 (steps 1–3 done: engine, clue DB, Crosshare adapter).
+`csp.py` is a score-maximizing branch-and-bound with **maintained arc consistency**
+(cell letter-domains propagate per assignment), so it prefers clue answers (e.g.
+"Golf goal" → PAR) and fills dense 15×15 grids in hundreds of nodes. It keeps the
+highest-total-score complete fill, not just the first consistent one.
+
+Accuracy on a full 15×15 is **signal-limited** (~15–20%): most themeless clues have
+no corpus match, so there's little to solve from. So `engine.py` **paints only
+confident cells** — a clued cell shows only when a covering slot clears
+`CONFIDENCE_THRESHOLD` (a clue match), surfacing what we know and leaving the rest
+blank; unclued manual-entry grids fill fully. Minis solve ~100%. Big-grid solve
+latency is dominated by serial clue-DB FTS lookups (~12 s for 70 clues) — the next
+perf target. See ARCHITECTURE §11. Roadmap: §9 (steps 1–3 done; step 4 = LLM
+booster + breadth).

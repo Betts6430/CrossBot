@@ -133,6 +133,7 @@ class ClueDB:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self.conn = conn
         self._answer_cache: dict[str, bool] = {}
+        self._freq: dict[str, int] | None = None
 
     @classmethod
     def open(cls, path: Path | str) -> "ClueDB":
@@ -169,6 +170,15 @@ class ClueDB:
                 pass
 
         return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+
+    def frequencies(self) -> dict[str, int]:
+        """All answers -> how often they appear as a fill (a quality prior).
+
+        Loaded once into memory (~hundreds of thousands of entries).
+        """
+        if self._freq is None:
+            self._freq = dict(self.conn.execute("SELECT answer, total FROM answers"))
+        return self._freq
 
     def is_known_answer(self, word: str) -> bool:
         cached = self._answer_cache.get(word)

@@ -267,8 +267,25 @@ The plan is to prove the engine first, then layer on automation.
   step.
 - **Possible backend-free mode:** port the solver to TS/WASM if we ever want a
   zero-install, extension-only build.
-- **Solver quality:** the CSP currently returns the *first* globally consistent
-  fill (trying clue answers first, MRV order). On real interlocking puzzles this
-  picks clue answers well, but it doesn't explicitly *maximize* total clue
-  agreement, so conflicting clues can lead to a suboptimal fill. A future pass
-  could search for the highest-summed-confidence solution.
+- **Solver quality (resolved):** the CSP no longer returns the *first* consistent
+  fill. `csp.py` is a score-maximizing branch-and-bound over candidates scored by
+  `max(clue confidence, quality prior)`, with **maintained arc consistency** (cell
+  letter-domains propagate on each assignment) so dense 15×15 grids fill in
+  hundreds of nodes instead of thrashing. It keeps the highest-*total*-score
+  complete fill, so an entry completed by crossings still prefers its own clue
+  answer (e.g. "Golf goal" → PAR, verified on a real Crosshare mini).
+- **Full-grid accuracy is signal-limited.** Minis solve ~100%, but a 15×15
+  themeless lands ~15–20% if forced to complete: most of its clues have no corpus
+  match, so the only signal is crossings + a word-frequency prior. This is a
+  *knowledge* gap (what the optional LLM booster, §9 step 4, is for), not a search
+  one — proven by the search still failing to complete a 15×15 even when the true
+  answers are injected into the vocabulary. Because a mostly-wrong complete grid is
+  worse than useless as an overlay, `engine.py` **paints only what it's confident
+  about**: a clued cell shows only when a covering slot clears
+  `CONFIDENCE_THRESHOLD` (a clue match; a quality-only guess ≤0.55 does not), so on
+  a hard grid we surface the answers we know (the strong clue answers, placed as
+  consistent anchors) and leave the rest blank. Unclued manual-entry grids have no
+  clue to doubt, so they're filled in full.
+- **Solve latency on big grids:** clue-DB lookups are ~12 s for a 70-clue grid
+  (serial SQLite FTS fuzzy queries); minis (~10 clues) are ~1.5 s. Parallelizing
+  the lookups (per-thread read-only connections) is the next perf step.
