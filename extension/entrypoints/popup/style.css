@@ -120,6 +120,22 @@ body {
   font-size: 0.7rem;
 }
 
+.booster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+}
+
+.booster input:disabled {
+  cursor: not-allowed;
+}
+
+.booster:has(input:disabled) {
+  opacity: 0.55;
+}
+
 .actions {
   display: flex;
   gap: 8px;

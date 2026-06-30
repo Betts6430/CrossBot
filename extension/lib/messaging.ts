@@ -5,6 +5,8 @@ export interface SolveRequest {
   type: 'solve';
   puzzle: Puzzle;
   backendUrl?: string;
+  /** Opt the optional AI booster in/out for this solve; omitted = backend default. */
+  boost?: boolean;
 }
 
 /** Background -> content script: the result, or an error message. */

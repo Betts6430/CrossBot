@@ -258,9 +258,12 @@ The plan is to prove the engine first, then layer on automation.
    layer anchored to each cell's rect. Verified live in a real browser.*
 4. **Polish & breadth** — per-clue fill / single-letter reveal, more site
    adapters, optional Ollama booster (*in progress*: client/prompt/parse, iterative
-   engine integration, and confidence calibration landed — LLM answers feed the CSP
-   but only paint where corroborated by confident crossings; extension toggle +
-   live validation next), then `.puz` / `.ipuz` file import.
+   engine integration, confidence calibration, and the per-solve toggle landed — LLM
+   answers feed the CSP but only paint where corroborated by confident crossings;
+   `POST /solve?boost=` opts in/out per request, `/health` advertises whether a
+   booster is configured, and the extension surfaces both as a "use AI booster"
+   checkbox; live validation against a real Ollama box next), then `.puz` / `.ipuz`
+   file import.
 
 ---
 

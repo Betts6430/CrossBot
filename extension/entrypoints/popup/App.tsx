@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react';
 import type { Cell } from '@/lib/model/puzzle';
 import { DEFAULT_BACKEND_URL, checkHealth, solvePuzzle } from '@/lib/api/client';
 import { buildPuzzle, emptyGrid, resizeGrid } from '@/lib/grid';
+import { getUseBooster, setUseBooster } from '@/lib/settings';
 import { GridEditor } from './GridEditor';
 
 const MIN = 2;
@@ -16,6 +17,8 @@ export function App() {
   const [selected, setSelected] = useState<[number, number] | null>(null);
   const [solution, setSolution] = useState<Cell[][] | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
+  const [boosterAvailable, setBoosterAvailable] = useState(false);
+  const [useBooster, setUseBoosterState] = useState(true);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -23,11 +26,21 @@ export function App() {
 
   useEffect(() => {
     let active = true;
-    checkHealth(backendUrl).then((ok) => active && setOnline(ok));
+    checkHealth(backendUrl).then((s) => {
+      if (!active) return;
+      setOnline(s.online);
+      setBoosterAvailable(s.booster);
+    });
+    getUseBooster().then((v) => active && setUseBoosterState(v));
     return () => {
       active = false;
     };
   }, [backendUrl]);
+
+  function toggleBooster(value: boolean) {
+    setUseBoosterState(value);
+    void setUseBooster(value); // persist for the content-script solve path too
+  }
 
   function resize(w: number, h: number) {
     setWidth(w);
@@ -76,7 +89,11 @@ export function App() {
     setBusy(true);
     setStatus('Solving…');
     try {
-      const result = await solvePuzzle(buildPuzzle(width, height, cells), backendUrl);
+      const result = await solvePuzzle(
+        buildPuzzle(width, height, cells),
+        backendUrl,
+        boosterAvailable ? useBooster : undefined,
+      );
       setSolution(result.filled);
       setStatus(
         result.status === 'solved'
@@ -139,6 +156,23 @@ export function App() {
       <p className="hint">
         Click a square, then type. <kbd>Space</kbd> = black square, <kbd>⌫</kbd> = clear.
       </p>
+
+      <label
+        className="booster"
+        title={
+          boosterAvailable
+            ? 'Ask the local AI model about clues the database can’t answer'
+            : 'Set CROSSBOT_LLM=ollama on the backend to enable the AI booster'
+        }
+      >
+        <input
+          type="checkbox"
+          checked={boosterAvailable && useBooster}
+          disabled={!boosterAvailable}
+          onChange={(e) => toggleBooster(e.target.checked)}
+        />
+        Use AI booster{boosterAvailable ? '' : ' (not configured)'}
+      </label>
 
       <div className="actions">
         <button type="button" onClick={solve} disabled={busy || online === false}>

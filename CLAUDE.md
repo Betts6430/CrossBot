@@ -78,6 +78,10 @@ export PATH="$HOME/.local/node/bin:$PATH" && npm test --prefix extension
   confident (clue-DB/given) crossings — `CROSSBOT_LLM_CORROBORATION` (default 0.5)
   is the fraction of an answer's cells that must already be known; 0 = always paint,
   >1 = never. Tests must never hit a real model — use a fake client (`tests/test_llm.py`).
+  A solve can opt in/out per request via `POST /solve?boost=true|false` (omitted =
+  use it when configured); `/health` returns `booster: bool` so the extension shows
+  a "use AI booster" checkbox (persisted in `lib/settings.ts`) only when it'd do
+  something. The env still gates availability — the toggle is a no-op without Ollama.
 
 ## Solver behaviour & limitation
 

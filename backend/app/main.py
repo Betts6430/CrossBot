@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.config import llm_config
 
 app = FastAPI(title="CrossBot Backend", version="0.0.1")
 
@@ -27,6 +28,10 @@ app.include_router(router)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    """Liveness check used by the extension to confirm the backend is up."""
-    return {"status": "ok"}
+def health() -> dict[str, object]:
+    """Liveness check used by the extension to confirm the backend is up.
+
+    Also advertises whether the optional LLM booster is configured, so the
+    extension only shows/enables its "use AI booster" toggle when it would do
+    something (the standard $0 path reports ``booster: false``)."""
+    return {"status": "ok", "booster": llm_config().enabled}

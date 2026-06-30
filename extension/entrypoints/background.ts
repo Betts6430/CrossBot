@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { DEFAULT_BACKEND_URL } from '@/lib/api/client';
+import { DEFAULT_BACKEND_URL, solveUrl } from '@/lib/api/client';
 import type { SolveRequest, SolveResponse } from '@/lib/messaging';
 
 // The background worker does the backend fetch: a content script's fetch to
@@ -12,7 +12,7 @@ export default defineBackground(() => {
 
     return (async (): Promise<SolveResponse> => {
       try {
-        const res = await fetch(`${msg.backendUrl ?? DEFAULT_BACKEND_URL}/solve`, {
+        const res = await fetch(solveUrl(msg.backendUrl ?? DEFAULT_BACKEND_URL, msg.boost), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(msg.puzzle),

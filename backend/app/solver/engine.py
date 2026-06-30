@@ -18,7 +18,7 @@ from app.models import Puzzle, SlotAnswer, SolveResult
 from app.solver.candidates import CandidateProvider
 from app.solver.csp import Solver
 from app.solver.grid import Coord, Entry, derive_entries
-from app.solver.llm import Gap, boost, get_llm_client
+from app.solver.llm import Gap, boost as boost_gaps, get_llm_client
 
 # For a *clued* slot, only paint a cell when some covering slot scores at least
 # this. A clue match (exact ~0.9-0.99, top fuzzy ~0.6) clears it; a fill chosen
@@ -140,8 +140,14 @@ def _gaps(entries: list[Entry], shown: dict[Coord, str], limit: int) -> list[Gap
     return [gap for _, gap in ranked[:limit]]
 
 
-def solve_puzzle(puzzle: Puzzle) -> SolveResult:
-    """Solve a puzzle end to end and return the filled grid + per-slot answers."""
+def solve_puzzle(puzzle: Puzzle, *, boost: bool | None = None) -> SolveResult:
+    """Solve a puzzle end to end and return the filled grid + per-slot answers.
+
+    ``boost`` opts the optional LLM booster in or out for this one solve: ``None``
+    (the default) or ``True`` uses it when the backend has one configured, ``False``
+    skips it entirely. The booster still does nothing unless a local model is set up
+    (``CROSSBOT_LLM=ollama``), so the opt-out only matters on a booster-enabled box.
+    """
     provider = CandidateProvider(get_wordlist(), get_clue_db())
     entries = _entries_for(puzzle)
 
@@ -156,14 +162,15 @@ def solve_puzzle(puzzle: Puzzle) -> SolveResult:
 
     # Optional LLM booster (off by default): ask a local model about the slots still
     # unresolved, feeding it their crossing letters; inject the answers and re-solve.
-    # Stop once a round resolves nothing new (or there's nothing left to ask).
-    client = get_llm_client()
+    # Stop once a round resolves nothing new (or there's nothing left to ask). A
+    # ``boost=False`` opt-out skips the model without even constructing the client.
+    client = get_llm_client() if boost is not False else None
     if client is not None:
         for _ in range(max(1, cfg.rounds)):
             gaps = _gaps(entries, shown_letters, cfg.max_gaps)
             if not gaps:
                 break
-            extra = boost(gaps, client)
+            extra = boost_gaps(gaps, client)
             if not extra:
                 break
             for slot_id, scored in extra.items():

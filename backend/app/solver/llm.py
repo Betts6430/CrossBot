@@ -10,8 +10,10 @@ length and the crossing letters already fixed by the grid (a pattern like
 extra scored candidates that flow back through ``CandidateProvider`` exactly like
 clue-database answers, so the CSP still owns making every crossing agree.
 
-Enable with ``CROSSBOT_LLM=ollama`` (see ``app/config.py``). Not wired into the
-solve pipeline yet -- this module is the client + prompt/parse layer.
+Enable with ``CROSSBOT_LLM=ollama`` (see ``app/config.py``); ``engine.py`` then
+runs it on unresolved slots and re-solves. A solve can also opt out per request
+(``POST /solve?boost=false``), surfaced as the extension's "use AI booster" toggle.
+This module is the client + prompt/parse layer.
 """
 
 from __future__ import annotations

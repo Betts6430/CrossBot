@@ -35,3 +35,11 @@ def test_solve_open_grid_no_slots() -> None:
             assert cell not in (None, "")  # fully filled, no blocks here
     assert len(data["answers"]) == 6
     assert all(a["answer"] for a in data["answers"])
+
+
+def test_solve_accepts_boost_query_param() -> None:
+    # The booster opt-out is a no-op here (no model configured), but the route
+    # must accept the flag rather than 422 on an unexpected query param.
+    puzzle = {"width": 3, "height": 1, "cells": [["", "", ""]]}
+    res = client.post("/solve?boost=false", json=puzzle)
+    assert res.status_code == 200

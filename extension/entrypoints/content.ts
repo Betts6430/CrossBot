@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { findAdapter } from '@/lib/adapters';
 import { clearOverlay, renderOverlay } from '@/lib/overlay';
+import { getUseBooster } from '@/lib/settings';
 import type { SolveRequest, SolveResponse } from '@/lib/messaging';
 
 // Runs on supported puzzle pages: detect the puzzle, and on a click extract it,
@@ -39,6 +40,7 @@ export default defineContentScript({
         const resp = (await browser.runtime.sendMessage({
           type: 'solve',
           puzzle,
+          boost: await getUseBooster(),
         } satisfies SolveRequest)) as SolveResponse;
         if (!resp.ok) throw new Error(resp.error);
         renderOverlay(document, resp.result, (r, c) => adapter.cellElement(document, r, c));

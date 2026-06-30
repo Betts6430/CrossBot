@@ -124,3 +124,19 @@ def test_llm_answer_paints_only_where_corroborated(
 
     assert res.filled[1] == ["A", "R", "E"]  # 4A painted: (1,0) via corroborated LLM
     assert res.filled[2][0] == ""            # 1D under-corroborated, 5A unanswered -> blank
+
+
+def test_boost_false_opts_out_of_the_booster(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An enabled booster would paint CAT here (corroboration=0). The per-solve
+    # opt-out skips the model, so the unmatched clue stays blank instead.
+    path = tmp_path / "c.sqlite"
+    build_clue_db([("DOG", "Canine")], path)
+    _use(monkeypatch, ClueDB.open(path), ["CAT", "COT", "CUT"])
+    _enable_booster(monkeypatch, '{"1A": ["CAT"]}', corroboration=0.0)
+    puzzle = Puzzle(width=3, height=1, cells=[["", "", ""]],
+                    clues=[ClueRef(number=1, direction="across", clue="mystery zxqw clue")])
+
+    assert engine.solve_puzzle(puzzle).filled[0] == ["C", "A", "T"]  # default: use it
+    assert engine.solve_puzzle(puzzle, boost=False).filled[0] == ["", "", ""]  # opt-out
