@@ -126,6 +126,28 @@ def test_llm_answer_paints_only_where_corroborated(
     assert res.filled[2][0] == ""            # 1D under-corroborated, 5A unanswered -> blank
 
 
+def test_llm_nonword_never_paints_but_corpus_fill_does(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Even at corroboration=0 ("always paint"), an LLM answer only paints if it's
+    # real crossword fill. ABC is in the clue-DB answer vocabulary (crosswordese /
+    # abbrevs the plain word list lacks) -> paints. XQZ is a hallucination in
+    # neither the word list nor the corpus -> stays blank however corroborated.
+    path = tmp_path / "c.sqlite"
+    build_clue_db([("DOG", "Canine"), ("ABC", "Alphabet trio")], path)
+    _use(monkeypatch, ClueDB.open(path), ["CAT", "COT", "CUT"])  # note: ABC not here
+
+    good = Puzzle(width=3, height=1, cells=[["", "", ""]],
+                  clues=[ClueRef(number=1, direction="across", clue="mystery zxqw clue")])
+    _enable_booster(monkeypatch, '{"1A": ["ABC"]}', corroboration=0.0)
+    assert engine.solve_puzzle(good).filled[0] == ["A", "B", "C"]  # corpus fill paints
+
+    bad = Puzzle(width=3, height=1, cells=[["", "", ""]],
+                 clues=[ClueRef(number=1, direction="across", clue="mystery zxqw clue")])
+    _enable_booster(monkeypatch, '{"1A": ["XQZ"]}', corroboration=0.0)
+    assert engine.solve_puzzle(bad).filled[0] == ["", "", ""]  # hallucination blanked
+
+
 def test_boost_false_opts_out_of_the_booster(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

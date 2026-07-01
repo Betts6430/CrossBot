@@ -77,7 +77,11 @@ export PATH="$HOME/.local/node/bin:$PATH" && npm test --prefix extension
   for unresolved slots, but its answers **only paint when corroborated** by
   confident (clue-DB/given) crossings — `CROSSBOT_LLM_CORROBORATION` (default 0.5)
   is the fraction of an answer's cells that must already be known; 0 = always paint,
-  >1 = never. Tests must never hit a real model — use a fake client (`tests/test_llm.py`).
+  >1 = never. A booster answer also **only paints if it's real crossword fill**
+  (word list *or* clue-DB answer vocabulary, via `CandidateProvider.is_valid_fill`),
+  so a hallucinated non-word never reaches the grid even when corroborated — while
+  crosswordese/abbrevs/multi-word answers (ASIF, YMCA) still can (engine tier 3).
+  Tests must never hit a real model — use a fake client (`tests/test_llm.py`).
   A solve can opt in/out per request via `POST /solve?boost=true|false` (omitted =
   use it when configured); `/health` returns `booster: bool` so the extension shows
   a "use AI booster" checkbox (persisted in `lib/settings.ts`) only when it'd do

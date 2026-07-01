@@ -152,7 +152,10 @@ overlay consumes the *same* `SolveResult`.
     the grid is re-solved — repeated for a few rounds (stopping early on no
     progress) so each fill tightens the patterns the model sees. The model's
     answers improve the fill but are **painted only where corroborated** by
-    confident (clue-DB/given) crossings, so a free-floating guess never shows.
+    confident (clue-DB/given) crossings, so a free-floating guess never shows —
+    and only if the answer is **real crossword fill** (`is_valid_fill`: word list
+    or clue-DB answer vocabulary), so a hallucinated non-word is blanked even when
+    corroborated, while crosswordese/abbrevs (ASIF, YMCA) still paint.
   - `engine.py` — orchestrates the above.
 - **`app/data`** — loaders for the word list and the clue database.
 - **`data/`** — the actual datasets (word list, `clues.sqlite`). **Not committed**

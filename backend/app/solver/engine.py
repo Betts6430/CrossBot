@@ -103,6 +103,9 @@ def _painted_letters(
             word = "".join(fill[cell] for cell in entry.cells)
             if provider.base_confidence(entry, word) >= CONFIDENCE_THRESHOLD:
                 continue  # already painted in tier 2
+            if not provider.is_valid_fill(word):
+                continue  # a hallucinated non-word never paints, however corroborated
+                          # -- but real fill (words, ASIF/YMCA/abbrevs) still can
             if provider.confidence(entry, word) < CONFIDENCE_THRESHOLD:
                 continue  # not even the LLM is confident
             need = math.ceil(corroboration * len(entry.cells))
